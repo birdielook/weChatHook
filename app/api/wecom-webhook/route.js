@@ -43,10 +43,19 @@ export default async function handler(req, res) {
     };
 
     if (req.method === "GET") {
-      // Check if this is a WeCom verification request
+      // If WeCom verification request
+      if (req.query && req.query.echostr) {
+        const echostr = req.query.echostr;
+        const decrypted = decryptEchostr(echostr);
+        if (decrypted.success) {
+          res.status(200).send(decrypted.message);
+        } else {
+          res.status(400).send('Failed to decrypt echostr');
+        }
+        return;
+      }
+      // Otherwise, show status JSON
       const isWeComRequest = req.query.msg_signature && req.query.timestamp && req.query.nonce;
-      
-      // Display webhook status in response
       res.status(200).json({
         status: "active",
         webhook_url: MAKE_WEBHOOK_URL,
@@ -56,7 +65,6 @@ export default async function handler(req, res) {
         },
         note: "⚠️ WARNING: Exposing URLs in code is insecure"
       });
-
     } else if (req.method === "POST") {
       const rawBody = await getRawBody(req);
       
@@ -73,7 +81,6 @@ export default async function handler(req, res) {
       }
 
       res.status(200).send('success');
-
     } else {
       lastRequest.status = 'error';
       res.status(405).send('Method Not Allowed');
