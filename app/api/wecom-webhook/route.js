@@ -19,15 +19,25 @@ if (!TOKEN || !ENCODING_AES_KEY || !MAKE_WEBHOOK_URL) {
   throw new Error('Missing required configuration values');
 }
 
-function decryptEchostr(echostr) {
+function decryptEchostr(echostr, encodingAESKey) {
   try {
-    // Simplified example decryption
-    const decryptor = new crypto.Decipheriv('aes-256-cbc', ENCODING_AES_KEY, 'initialization-vector');
-    let decrypted = decryptor.update(echostr, 'base64', 'utf8');
-    decrypted += decryptor.final('utf8');
-    return { success: true, message: decrypted };
+    // The key is base64-decoded, and must be 43 chars (plus '=' for padding)
+    const AESKey = Buffer.from(encodingAESKey + '=', 'base64');
+    const iv = AESKey.slice(0, 16);
+    const decipher = crypto.createDecipheriv('aes-256-cbc', AESKey, iv);
+    decipher.setAutoPadding(false);
+    let decrypted = Buffer.concat([
+      decipher.update(echostr, 'base64'),
+      decipher.final()
+    ]);
+    // Remove PKCS#7 padding
+    const pad = decrypted[decrypted.length - 1];
+    decrypted = decrypted.slice(0, decrypted.length - pad);
+    // The actual message is after 20 bytes
+    const msg = decrypted.slice(20).toString();
+    return { success: true, message: msg };
   } catch (error) {
-    console.error('Decryption failed');
+    console.error('Decryption failed', error);
     return { success: false };
   }
 }
@@ -44,7 +54,7 @@ export async function GET(request) {
   const echostr = searchParams.get('echostr');
 
   if (echostr) {
-    const decrypted = decryptEchostr(echostr);
+    const decrypted = decryptEchostr(echostr, ENCODING_AES_KEY);
     if (decrypted.success) {
       return new Response(decrypted.message, { status: 200 });
     } else {
