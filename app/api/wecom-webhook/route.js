@@ -4,7 +4,7 @@ import crypto from "crypto";
 // ⚠️ SECURITY WARNING: Exposing credentials in code is not recommended
 const TOKEN = "YOUR_WECOM_TOKEN"; // Replace with actual token
 const ENCODING_AES_KEY = "YOUR_WECOM_AES_KEY"; // Replace with actual key
-const MAKE_WEBHOOK_URL = "https://hook.make.com/your-actual-webhook-url"; // Exposed directly
+const MAKE_WEBHOOK_URL = "https://hook.us2.make.com/8e6ffe66n5pj9lcyy9w23nvgniku5o9e"; // Exposed directly
 
 // Validate required values at startup
 if (!TOKEN || !ENCODING_AES_KEY || !MAKE_WEBHOOK_URL) {
