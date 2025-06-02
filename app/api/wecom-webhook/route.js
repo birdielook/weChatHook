@@ -32,69 +32,57 @@ function decryptEchostr(echostr) {
   }
 }
 
-export default async function handler(req, res) {
-  try {
-    // Update last request info
-    lastRequest = {
-      timestamp: new Date().toISOString(),
-      method: req.method,
-      source: req.headers['user-agent'] || 'Unknown',
-      status: 'success'
-    };
+export async function GET(request) {
+  lastRequest = {
+    timestamp: new Date().toISOString(),
+    method: "GET",
+    source: request.headers.get('user-agent') || 'Unknown',
+    status: 'success'
+  };
 
-    if (req.method === "GET") {
-      if (req.query && req.query.echostr) {
-        // If WeCom verification request
-        const echostr = req.query.echostr;
-        const decrypted = decryptEchostr(echostr);
-        if (decrypted.success) {
-          res.status(200).send(decrypted.message);
-        } else {
-          res.status(400).send('Failed to decrypt echostr');
-        }
-        return;
-      }
-      // Otherwise, show status JSON
-      res.status(200).json({
-        status: "active",
-        webhook_url: MAKE_WEBHOOK_URL,
-        last_request: {
-          ...lastRequest,
-          is_wecom: req.query.msg_signature && req.query.timestamp && req.query.nonce
-        },
-        note: "⚠️ WARNING: Exposing URLs in code is insecure"
-      });
-    } else if (req.method === "POST") {
-      const rawBody = await getRawBody(req);
-      
-      // Forward to exposed webhook URL
-      const response = await fetch(MAKE_WEBHOOK_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/xml" },
-        body: rawBody,
-      });
+  const { searchParams } = new URL(request.url);
+  const echostr = searchParams.get('echostr');
 
-      if (!response.ok) {
-        console.error('Forwarding failed');
-        return res.status(502).send('Gateway error');
-      }
-
-      res.status(200).send('success');
+  if (echostr) {
+    const decrypted = decryptEchostr(echostr);
+    if (decrypted.success) {
+      return new Response(decrypted.message, { status: 200 });
     } else {
-      lastRequest.status = 'error';
-      res.status(405).send('Method Not Allowed');
+      return new Response('Failed to decrypt echostr', { status: 400 });
     }
-  } catch (error) {
-    lastRequest.status = 'error';
-    console.error('Server error:', error.message);
-    res.status(500).send('Internal server error');
   }
+
+  return Response.json({
+    status: "active",
+    webhook_url: MAKE_WEBHOOK_URL,
+    last_request: {
+      ...lastRequest,
+      is_wecom: searchParams.get('msg_signature') && searchParams.get('timestamp') && searchParams.get('nonce')
+    },
+    note: "⚠️ WARNING: Exposing URLs in code is insecure"
+  });
 }
 
-async function getRawBody(req) {
-  const buffers = [];
-  for await (const chunk of req) {
-    buffers.push(chunk);
+export async function POST(request) {
+  lastRequest = {
+    timestamp: new Date().toISOString(),
+    method: "POST",
+    source: request.headers.get('user-agent') || 'Unknown',
+    status: 'success'
+  };
+
+  const rawBody = await request.text();
+
+  const response = await fetch(MAKE_WEBHOOK_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/xml" },
+    body: rawBody,
+  });
+
+  if (!response.ok) {
+    console.error('Forwarding failed');
+    return new Response('Gateway error', { status: 502 });
   }
-  return Buffer.concat(buffers);
+
+  return new Response('success', { status: 200 });
 }
