@@ -1,10 +1,10 @@
 // api/wecom-webhook.js
 import crypto from "crypto";
 
-// ⚠️ SECURITY WARNING: Exposing credentials in code is not recommended
-const TOKEN = "YOUR_WECOM_TOKEN"; // Replace with actual token
-const ENCODING_AES_KEY = "YOUR_WECOM_AES_KEY"; // Replace with actual key
-const MAKE_WEBHOOK_URL = "https://hook.us2.make.com/8e6ffe66n5pj9lcyy9w23nvgniku5o9e"; // Exposed directly
+// Read sensitive values from environment variables for security
+const TOKEN = process.env.WECOM_TOKEN || "YOUR_WECOM_TOKEN"; // Replace with actual token or set env var
+const ENCODING_AES_KEY = process.env.WECOM_AES_KEY || "YOUR_WECOM_AES_KEY"; // Replace with actual key or set env var
+const MAKE_WEBHOOK_URL = process.env.MAKE_WEBHOOK_URL || "https://hook.us2.make.com/8e6ffe66n5pj9lcyy9w23nvgniku5o9e";
 
 // Track last request
 let lastRequest = {
@@ -19,6 +19,7 @@ if (!TOKEN || !ENCODING_AES_KEY || !MAKE_WEBHOOK_URL) {
   throw new Error('Missing required configuration values');
 }
 
+// Robust WeCom echostr decryption
 function decryptEchostr(echostr, encodingAESKey) {
   try {
     // The key is base64-decoded, and must be 43 chars (plus '=' for padding)
@@ -38,7 +39,7 @@ function decryptEchostr(echostr, encodingAESKey) {
     return { success: true, message: msg };
   } catch (error) {
     console.error('Decryption failed', error);
-    return { success: false };
+    return { success: false, error: error.message };
   }
 }
 
@@ -52,22 +53,31 @@ export async function GET(request) {
 
   const { searchParams } = new URL(request.url);
   const echostr = searchParams.get('echostr');
+  const msg_signature = searchParams.get('msg_signature');
+  const timestamp = searchParams.get('timestamp');
+  const nonce = searchParams.get('nonce');
+
+  // Log incoming query params for debugging
+  console.log('WeCom GET params:', { msg_signature, timestamp, nonce, echostr });
 
   if (echostr) {
     const decrypted = decryptEchostr(echostr, ENCODING_AES_KEY);
     if (decrypted.success) {
+      console.log('Decrypted echostr:', decrypted.message);
       return new Response(decrypted.message, { status: 200 });
     } else {
+      console.error('Failed to decrypt echostr:', decrypted.error);
       return new Response('Failed to decrypt echostr', { status: 400 });
     }
   }
 
+  // For browser or status checks
   return Response.json({
     status: "active",
     webhook_url: MAKE_WEBHOOK_URL,
     last_request: {
       ...lastRequest,
-      is_wecom: searchParams.get('msg_signature') && searchParams.get('timestamp') && searchParams.get('nonce')
+      is_wecom: msg_signature && timestamp && nonce
     },
     note: "⚠️ WARNING: Exposing URLs in code is insecure"
   });
@@ -83,6 +93,7 @@ export async function POST(request) {
 
   const rawBody = await request.text();
 
+  // Forward to Make.com webhook
   const response = await fetch(MAKE_WEBHOOK_URL, {
     method: "POST",
     headers: { "Content-Type": "application/xml" },
