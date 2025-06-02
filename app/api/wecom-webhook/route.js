@@ -6,6 +6,14 @@ const TOKEN = "YOUR_WECOM_TOKEN"; // Replace with actual token
 const ENCODING_AES_KEY = "YOUR_WECOM_AES_KEY"; // Replace with actual key
 const MAKE_WEBHOOK_URL = "https://hook.us2.make.com/8e6ffe66n5pj9lcyy9w23nvgniku5o9e"; // Exposed directly
 
+// Track last request
+let lastRequest = {
+  timestamp: null,
+  method: null,
+  source: null,
+  status: null
+};
+
 // Validate required values at startup
 if (!TOKEN || !ENCODING_AES_KEY || !MAKE_WEBHOOK_URL) {
   throw new Error('Missing required configuration values');
@@ -26,11 +34,26 @@ function decryptEchostr(echostr) {
 
 export default async function handler(req, res) {
   try {
+    // Update last request info
+    lastRequest = {
+      timestamp: new Date().toISOString(),
+      method: req.method,
+      source: req.headers['user-agent'] || 'Unknown',
+      status: 'success'
+    };
+
     if (req.method === "GET") {
-      // Display webhook URL in response for demonstration
+      // Check if this is a WeCom verification request
+      const isWeComRequest = req.query.msg_signature && req.query.timestamp && req.query.nonce;
+      
+      // Display webhook status in response
       res.status(200).json({
         status: "active",
         webhook_url: MAKE_WEBHOOK_URL,
+        last_request: {
+          ...lastRequest,
+          is_wecom: isWeComRequest
+        },
         note: "⚠️ WARNING: Exposing URLs in code is insecure"
       });
 
@@ -52,9 +75,11 @@ export default async function handler(req, res) {
       res.status(200).send('success');
 
     } else {
+      lastRequest.status = 'error';
       res.status(405).send('Method Not Allowed');
     }
   } catch (error) {
+    lastRequest.status = 'error';
     console.error('Server error:', error.message);
     res.status(500).send('Internal server error');
   }
