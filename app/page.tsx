@@ -1,4 +1,24 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+
 export default function Home() {
+  const [webhookStatus, setWebhookStatus] = useState<{ status?: string; webhook_url?: string }>({});
+
+  useEffect(() => {
+    const checkWebhookStatus = async () => {
+      try {
+        const response = await fetch('/api/wecom-webhook');
+        const data = await response.json();
+        setWebhookStatus(data);
+      } catch (error) {
+        console.error('Failed to fetch webhook status:', error);
+      }
+    };
+
+    checkWebhookStatus();
+  }, []);
+
   return (
     <main className="min-h-screen p-8">
       <div className="max-w-4xl mx-auto">
@@ -21,6 +41,25 @@ export default function Home() {
           <div className="p-6 border rounded-lg">
             <h2 className="text-xl font-semibold mb-2">Deploy</h2>
             <p className="text-gray-600">Deploy your application to Vercel with a single click.</p>
+          </div>
+
+          <div className="p-6 border rounded-lg">
+            <h2 className="text-xl font-semibold mb-2">Webhook Status</h2>
+            <div className="text-gray-600">
+              <p className="mb-2">Status: <span className={webhookStatus.status === 'active' ? 'text-green-600' : 'text-red-600'}>
+                {webhookStatus.status || 'Loading...'}
+              </span></p>
+              {webhookStatus.webhook_url && (
+                <a 
+                  href="/api/wecom-webhook" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:underline"
+                >
+                  View Webhook Details
+                </a>
+              )}
+            </div>
           </div>
         </div>
       </div>
