@@ -64,7 +64,10 @@ export async function GET(request) {
     const decrypted = decryptEchostr(echostr, ENCODING_AES_KEY);
     if (decrypted.success) {
       console.log('Decrypted echostr:', decrypted.message);
-      return new Response(decrypted.message, { status: 200 });
+      return new Response(decrypted.message.trim(), {
+        status: 200,
+        headers: { "Content-Type": "text/plain; charset=utf-8" }
+      });
     } else {
       console.error('Failed to decrypt echostr:', decrypted.error);
       return new Response('Failed to decrypt echostr', { status: 400 });
