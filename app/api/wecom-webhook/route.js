@@ -43,8 +43,8 @@ export default async function handler(req, res) {
     };
 
     if (req.method === "GET") {
-      // If WeCom verification request
       if (req.query && req.query.echostr) {
+        // If WeCom verification request
         const echostr = req.query.echostr;
         const decrypted = decryptEchostr(echostr);
         if (decrypted.success) {
@@ -55,13 +55,12 @@ export default async function handler(req, res) {
         return;
       }
       // Otherwise, show status JSON
-      const isWeComRequest = req.query.msg_signature && req.query.timestamp && req.query.nonce;
       res.status(200).json({
         status: "active",
         webhook_url: MAKE_WEBHOOK_URL,
         last_request: {
           ...lastRequest,
-          is_wecom: isWeComRequest
+          is_wecom: req.query.msg_signature && req.query.timestamp && req.query.nonce
         },
         note: "⚠️ WARNING: Exposing URLs in code is insecure"
       });
